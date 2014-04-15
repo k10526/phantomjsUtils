@@ -1,6 +1,7 @@
 var $_ = require('./asdf.server-min.js');
 var MAX_TIMEOUT = 3000;
 var RETRY_TIMEOUT = 20;
+var PAGE_OPEN_TIMEOUT_SEC =0.5;
 function step(){
 	function create(onSuccess, onFailure){
 		var steps = [];
@@ -43,6 +44,42 @@ function step(){
 	}	
 }
 
+function dump(obj){
+	var res = '';
+	var TABSIZE = 4;
+	function rec(o, inner){
+		var s = '';
+		$_.O.each(o, function (v, k){
+			var vs;
+			if($_.O.isFunction(v))
+				vs = '[FUNCTION]';
+			else if($_.O.isArray(v))
+				vs = '[\n' + rec(v,inner+1) +'\n'+$_.S.times(' ', inner*TABSIZE)+']';
+			else if($_.O.isObject(v))
+				vs = '{\n' + rec(v,inner+1) +'\n'+$_.S.times(' ', inner*TABSIZE)+'}';
+			else
+				vs = '"' + v + '"';
+			return s += $_.S.times(' ', inner*TABSIZE) + '"' + k + '" : ' + vs + '\n';
+		});
+		return s;
+	}
+	if($_.O.isObject(obj))
+		res = '{\n'+ rec(obj, 1) +'\n}';
+	res = res || obj
+	console.log(res);
+	return obj;
+}
+
+function pageOpen(page, url, nextFn){
+	page.openUrl(encodeURI(url), {
+		operation: 'get',
+		data: undefined
+	},
+	page.settings);
+   	$_.F.delay(nextFn, PAGE_OPEN_TIMEOUT_SEC);
+}
+
+
 function waitFor(page, testFn, onSuccess, onFailure, timeout, details){
 	timeout = timeout || MAX_TIMEOUT;
 	details = details || {testFn: testFn};
@@ -77,6 +114,7 @@ var waitForUrl = function(page, url, onSuccess, onFailure, timeout){
 
 var fillForm = function(page, obj, onSuccess, onFailure, details) {
 	"use stric";
+	var completed = false;
 	if($_.O.isNotPlainObject(obj)) throw new Error('fillForm() needs a obj');
 	
 	page.includeJs("http://www.asdfjs.com/javascripts/asdf.js", function(){
@@ -92,10 +130,14 @@ var fillForm = function(page, obj, onSuccess, onFailure, details) {
 			});
 			form.submit();
 		}), obj);
-		onSuccess(page);
+		if(!completed)
+			onSuccess(page);
+		completed = true;
 	});
 }
 module.exports.waitFor = waitFor;
 module.exports.waitForUrl = waitForUrl;
 module.exports.fillForm = fillForm;
 module.exports.step = step();
+module.exports.pageOpen = pageOpen;
+module.exports.dump = dump;
